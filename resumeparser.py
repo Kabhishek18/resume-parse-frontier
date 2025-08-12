@@ -4,23 +4,28 @@ import yaml
 import json
 from openai import OpenAI
 import google.generativeai as genai
+import ollama
+from ollama import ResponseError
 
 # --- CONFIGURATION ---
 
-def load_api_keys():
-    """Loads API keys from the configuration file."""
+def load_config():
+    """Loads API keys and model configs from the configuration file."""
     try:
         with open("config.yaml") as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
-            return config.get("OPENAI_API_KEY"), config.get("GOOGLE_API_KEY")
+            return config
     except FileNotFoundError:
         print("ERROR: config.yaml not found. Please create it.")
-        return None, None
+        return {}
 
-OPENAI_KEY, GOOGLE_KEY = load_api_keys()
+config = load_config()
+OPENAI_KEY = config.get("OPENAI_API_KEY")
+GOOGLE_KEY = config.get("GOOGLE_API_KEY")
+OLLAMA_MODEL = config.get("OLLAMA_MODEL", "llama3") # Default to llama3 if not set
 
-# Configure the Gemini client
-if GOOGLE_KEY:
+# Configure online clients
+if GOOGLE_KEY and GOOGLE_KEY != "YOUR GEMINI KEY HERE":
     genai.configure(api_key=GOOGLE_KEY)
 
 # --- PROMPT DEFINITION ---
@@ -44,8 +49,8 @@ IMPORTANT: Respond with ONLY the JSON object. Do not include any introductory te
 
 def _call_openai(resume_data):
     """Calls the OpenAI GPT model."""
-    if not OPENAI_KEY:
-        raise ValueError("OpenAI API key is missing from config.yaml")
+    if not OPENAI_KEY or OPENAI_KEY == "YOUR OPENAI KEY HERE":
+        raise ValueError("OpenAI API key is missing or not set in config.yaml")
         
     client = OpenAI(api_key=OPENAI_KEY)
     
@@ -57,50 +62,69 @@ def _call_openai(resume_data):
         ],
         temperature=0.0,
         max_tokens=1500,
-        response_format={"type": "json_object"} # Use JSON mode
+        response_format={"type": "json_object"}
     )
     return response.choices[0].message.content
 
 def _call_gemini(resume_data):
     """Calls the Google Gemini Pro model."""
-    if not GOOGLE_KEY:
-        raise ValueError("Google API key is missing from config.yaml")
+    if not GOOGLE_KEY or GOOGLE_KEY == "YOUR GEMINI KEY HERE":
+        raise ValueError("Google API key is missing or not set in config.yaml")
 
     model = genai.GenerativeModel('gemini-pro')
-    # Gemini requires the prompt to be structured differently
     full_prompt = f"{SYSTEM_PROMPT}\n\nResume Text:\n{resume_data}"
     
     response = model.generate_content(full_prompt)
     
-    # Clean up the response to ensure it's valid JSON
-    # Gemini might sometimes include ```json ... ``` which we need to remove.
     cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
     return cleaned_response
+
+def _call_ollama(resume_data):
+    """Calls a local Ollama model."""
+    try:
+        client = ollama.Client()
+        # Check if the model exists locally, if not, pull it
+        try:
+            client.show(OLLAMA_MODEL)
+        except ResponseError as e:
+            if e.status_code == 404:
+                print(f"Model '{OLLAMA_MODEL}' not found locally. Pulling it now...")
+                ollama.pull(OLLAMA_MODEL)
+                print(f"Model '{OLLAMA_MODEL}' pulled successfully.")
+            else:
+                raise
     
+        response = client.chat(
+            model=OLLAMA_MODEL,
+            messages=[
+                {'role': 'system', 'content': SYSTEM_PROMPT},
+                {'role': 'user', 'content': resume_data},
+            ],
+            format='json' # Use Ollama's built-in JSON mode
+        )
+        return response['message']['content']
+    except Exception as e:
+        # This will catch connection errors if the Ollama server isn't running
+        raise ConnectionError(f"Could not connect to Ollama server or the model '{OLLAMA_MODEL}' is not available. Is Ollama running?") from e
+
 # --- MAIN EXTRACTOR FUNCTION ---
 
 def extract_resume_data(resume_data, provider="gemini"):
     """
     Extracts information from resume text using the specified LLM provider.
-
-    Args:
-        resume_data (str): The text content of the resume.
-        provider (str): The LLM provider to use ('openai' or 'gemini').
-
-    Returns:
-        str: A JSON string of the extracted data.
     """
     try:
         if provider == "openai":
             return _call_openai(resume_data)
         elif provider == "gemini":
             return _call_gemini(resume_data)
+        elif provider == "ollama":
+            return _call_ollama(resume_data)
         else:
-            raise ValueError(f"Invalid provider specified: {provider}. Choose 'openai' or 'gemini'.")
+            raise ValueError(f"Invalid provider specified: {provider}. Choose 'openai', 'gemini', or 'ollama'.")
             
     except Exception as e:
         print(f"An error occurred with provider {provider}: {e}")
-        # Return an error structure in JSON format
         error_response = {
             "error": True,
             "message": str(e),

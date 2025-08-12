@@ -2,4 +2,6 @@
 OPENAI_API_KEY: "YOUR OPENAI KEY HERE"
 
 # Get your key from: https://aistudio.google.com/app/apikey
-GOOGLE_API_KEY: "YOUR GEMINI KEY HERE"
+GOOGLE_API_KEY: "sample"
+
+OLLAMA_MODEL: "gemma3:latest"

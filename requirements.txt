@@ -4,3 +4,5 @@ openai
 PyYAML
 google-generativeai
 python-dotenv
+python-docx
+ollama
