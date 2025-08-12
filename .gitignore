@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+*.venv
+env/
+.env
+
+# Uploads & Data
+__DATA__/
+*.pdf
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
