@@ -129,9 +129,11 @@
                         <p><strong>{{ job.position }}</strong> at <strong>{{ job.company }}</strong></p>
                         <p class="text-sm text-gray-400">{{ job.duration }}</p>
                         <ul class="list-disc list-inside mt-2 text-gray-300">
-                            {% for resp in job.responsibilities %}
-                                <li>{{ resp }}</li>
-                            {% endfor %}
+                            {% if job.responsibilities %}
+                                {% for resp in job.responsibilities %}
+                                    <li>{{ resp }}</li>
+                                {% endfor %}
+                            {% endif %}
                         </ul>
                     </div>
                 {% endfor %}
