@@ -39,10 +39,14 @@ RESUME_URLS = [
 
 OUTPUT_REPORT_PATH = 'extraction_report.csv'
 DOWNLOAD_FOLDER = 'temp_resumes_for_extraction'
+JSON_OUTPUT_FOLDER = '__BATCH_OUTPUTS__' # New folder for individual JSON files
 PROVIDER = 'ollama'  # Choose 'gemini', 'openai', or 'ollama'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Create output folder if it doesn't exist
+os.makedirs(JSON_OUTPUT_FOLDER, exist_ok=True)
 
 # --- HELPER FUNCTIONS ---
 
@@ -189,6 +193,18 @@ def run_extraction():
             if parsed_data.get("error"):
                 result_row['Status'] = f"Failed - Parser Error: {parsed_data.get('message')}"
             else:
+                # --- New Feature: Save individual JSON output ---
+                full_name = parsed_data.get('full_name', 'parsed_resume')
+                # Sanitize the filename to make it safe for file systems
+                safe_filename = "".join([c for c in full_name if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+                safe_filename = safe_filename.replace(' ', '_') + '.json'
+                output_filepath = os.path.join(JSON_OUTPUT_FOLDER, safe_filename)
+
+                with open(output_filepath, 'w') as json_file:
+                    json.dump(parsed_data, json_file, indent=4)
+                logging.info(f"Saved parsed JSON to {output_filepath}")
+                # --- End of new feature ---
+
                 flat_data = flatten_parsed_data(parsed_data)
                 result_row.update(flat_data)
                 result_row['Status'] = 'Processed'

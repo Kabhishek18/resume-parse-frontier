@@ -12,6 +12,7 @@ from resumeparser import extract_resume_data
 # --- SETUP ---
 
 UPLOAD_FOLDER = '__DATA__'
+OUTPUT_FOLDER = '__OUTPUTS__' # New folder for JSON outputs
 ALLOWED_EXTENSIONS = {'pdf', 'docx'}
 
 app = Flask(__name__)
@@ -22,6 +23,7 @@ app.config['SECRET_KEY'] = 'a-super-secret-key-for-flash-messages'
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True) # Create output folder if it doesn't exist
 
 # --- HELPER FUNCTIONS ---
 
@@ -101,6 +103,7 @@ def process_resume():
         app.logger.debug(f"Raw response from parser: {extracted_data_json_str}")
         
         try:
+            # Parse the JSON string to a Python dictionary
             data_dict = json.loads(extracted_data_json_str)
             app.logger.debug(f"Parsed dictionary from parser: {data_dict}")
 
@@ -110,7 +113,19 @@ def process_resume():
                  app.logger.error(f"Error returned from resumeparser: {error_message}")
                  return render_template('index.html', error=error_message, provider=provider)
             
-            # Success case
+            # --- New Feature: Save output to a name-based JSON file ---
+            full_name = data_dict.get('full_name', 'parsed_resume')
+            # Sanitize the filename to make it safe for file systems
+            safe_filename = "".join([c for c in full_name if c.isalpha() or c.isdigit() or c==' ']).rstrip()
+            safe_filename = safe_filename.replace(' ', '_') + '.json'
+            output_filepath = os.path.join(OUTPUT_FOLDER, safe_filename)
+            
+            with open(output_filepath, 'w') as json_file:
+                json.dump(data_dict, json_file, indent=4)
+            app.logger.info(f"Successfully saved parsed data to {output_filepath}")
+
+            # --- Fix for UI display ---
+            # The template expects a dictionary to render the fields, so we pass data_dict
             app.logger.info("Successfully parsed data. Rendering results page.")
             return render_template('index.html', data=data_dict, provider=provider)
 
