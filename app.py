@@ -3,6 +3,7 @@
 import os
 import json
 import docx
+import logging
 from flask import Flask, request, render_template, flash, redirect, url_for
 from pypdf import PdfReader
 from werkzeug.utils import secure_filename
@@ -16,6 +17,9 @@ ALLOWED_EXTENSIONS = {'pdf', 'docx'}
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SECRET_KEY'] = 'a-super-secret-key-for-flash-messages'
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -35,7 +39,7 @@ def read_pdf(path):
             data += page.extract_text()
         return data
     except Exception as e:
-        print(f"Error reading PDF: {e}")
+        app.logger.error(f"Error reading PDF: {e}")
         return None
 
 def read_docx(path):
@@ -47,7 +51,7 @@ def read_docx(path):
             full_text.append(para.text)
         return '\n'.join(full_text)
     except Exception as e:
-        print(f"Error reading DOCX: {e}")
+        app.logger.error(f"Error reading DOCX: {e}")
         return None
 
 # --- ROUTES ---
@@ -64,6 +68,7 @@ def process_resume():
 
     file = request.files['resume_doc']
     provider = request.form.get('provider', 'gemini')
+    app.logger.info(f"Processing request with provider: {provider}")
 
     if file.filename == '':
         flash('No file selected.', 'error')
@@ -73,6 +78,7 @@ def process_resume():
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
+        app.logger.info(f"File '{filename}' saved temporarily.")
 
         resume_text = None
         file_extension = filename.rsplit('.', 1)[1].lower()
@@ -83,30 +89,39 @@ def process_resume():
             resume_text = read_docx(filepath)
         
         os.remove(filepath)
+        app.logger.info(f"Temporary file '{filename}' removed.")
 
         if not resume_text:
             error_message = f'Could not extract text from the {file_extension.upper()} file. It might be empty, corrupted, or password-protected.'
+            app.logger.error(error_message)
             return render_template('index.html', error=error_message, provider=provider)
             
+        app.logger.info("Text extracted successfully. Calling resume parser...")
         extracted_data_json_str = extract_resume_data(resume_text, provider=provider)
+        app.logger.debug(f"Raw response from parser: {extracted_data_json_str}")
         
         try:
             data_dict = json.loads(extracted_data_json_str)
+            app.logger.debug(f"Parsed dictionary from parser: {data_dict}")
+
             # If the dictionary contains an 'error' key, it means the parser failed.
             if data_dict.get("error"):
                  error_message = data_dict.get('message', 'An unknown error occurred.')
+                 app.logger.error(f"Error returned from resumeparser: {error_message}")
                  return render_template('index.html', error=error_message, provider=provider)
             
             # Success case
+            app.logger.info("Successfully parsed data. Rendering results page.")
             return render_template('index.html', data=data_dict, provider=provider)
 
         except json.JSONDecodeError:
             error_message = f"Failed to parse the response from the AI. This often happens with model timeouts or unexpected outputs. Raw response: {extracted_data_json_str}"
+            app.logger.error(error_message)
             return render_template('index.html', error=error_message, provider=provider)
     else:
         flash('Invalid file type. Please upload a PDF or DOCX file.', 'error')
         return redirect(url_for('index'))
 
 if __name__ == "__main__":
-    # Use python app.py to run with these settings
-    app.run(port=8000, debug=True)
+    # Use 'python app.py' to run with these settings
+    app.run(port=5000, debug=True)

@@ -31,18 +31,30 @@ if GOOGLE_KEY and GOOGLE_KEY != "YOUR GEMINI KEY HERE":
 # --- PROMPT DEFINITION ---
 
 SYSTEM_PROMPT = """
-You are an expert ATS (Applicant Tracking System) bot. Your sole purpose is to parse a resume text and extract key information in a structured JSON format.
+You are a highly efficient and accurate ATS (Applicant Tracking System) bot. Your purpose is to parse a resume text and extract a comprehensive set of information into a structured JSON format.
 
-Given the resume text, extract the following fields:
+Given the resume text, extract the following fields with precision:
 1.  **full_name**: The full name of the candidate.
-2.  **email**: The primary email address.
-3.  **github**: The full URL to their GitHub profile. If not present, return null.
-4.  **linkedin**: The full URL to their LinkedIn profile. If not present, return null.
-5.  **employment_details**: A list of objects, where each object has "company", "position", and "duration".
-6.  **technical_skills**: A list of all technical skills (e.g., Python, React, SQL, AWS).
-7.  **soft_skills**: A list of all soft skills (e.g., Communication, Teamwork, Leadership).
+2.  **contact_information**: An object containing:
+    * **email**: The primary email address.
+    * **phone**: The phone number. If not present, return null.
+3.  **professional_links**: An object containing:
+    * **linkedin**: The full URL to their LinkedIn profile. If not present, return null.
+    * **github**: The full URL to their GitHub profile. If not present, return null.
+    * **portfolio**: Any other portfolio or personal website URL. If not present, return null.
+4.  **summary**: A brief professional summary or objective statement from the resume.
+5.  **experience**: A list of objects, where each object represents a job and has the following fields:
+    * **company**: The name of the company.
+    * **position**: The job title or position held.
+    * **duration**: The employment dates or duration (e.g., "Jan 2020 - Present" or "3 years").
+    * **responsibilities**: A list of key responsibilities, accomplishments, or a summary of the role.
+6.  **education**: A list of objects, each with "institution", "degree", and "graduation_date".
+7.  **skills**: An object containing:
+    * **technical**: A list of all technical skills (e.g., Python, React, SQL, AWS, Docker).
+    * **soft**: A list of all soft skills (e.g., Communication, Teamwork, Leadership, Problem-solving).
+8.  **certifications**: A list of any certifications mentioned.
 
-IMPORTANT: Respond with ONLY the JSON object. Do not include any introductory text, explanations, or markdown formatting like ```json. Your entire response must be a valid JSON.
+IMPORTANT: Your response MUST be a valid JSON object and nothing else. Do not include any introductory text, explanations, or markdown formatting like ```json.
 """
 
 # --- LLM API CALLS ---
@@ -61,7 +73,7 @@ def _call_openai(resume_data):
             {"role": "user", "content": resume_data}
         ],
         temperature=0.0,
-        max_tokens=1500,
+        max_tokens=2048, # Increased max_tokens for more detailed resumes
         response_format={"type": "json_object"}
     )
     return response.choices[0].message.content
@@ -74,7 +86,14 @@ def _call_gemini(resume_data):
     model = genai.GenerativeModel('gemini-pro')
     full_prompt = f"{SYSTEM_PROMPT}\n\nResume Text:\n{resume_data}"
     
-    response = model.generate_content(full_prompt)
+    # Add generation config for Gemini to encourage JSON output
+    generation_config = genai.types.GenerationConfig(
+        temperature=0.0,
+        max_output_tokens=2048,
+        response_mime_type="application/json"
+    )
+
+    response = model.generate_content(full_prompt, generation_config=generation_config)
     
     cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
     return cleaned_response

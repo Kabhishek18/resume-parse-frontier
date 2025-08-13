@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
-    <title>Resume Parser Frontier (Gemini + OpenAI + Ollama)</title>
+    <title>KABHISHEK18 - Resume Parser</title>
     <style>
         .flash-message {
             padding: 1rem;
@@ -27,18 +27,33 @@
             animation: spin 1s ease-in-out infinite;
             margin-right: 0.5rem;
         }
+        .data-section {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .data-heading {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #60a5fa; /* blue-400 */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="bg-gray-900 text-white font-sans">
     <div class="absolute inset-0 -z-10 h-full w-full bg-gray-900 stroke-white/10 [mask-image:radial-gradient(100%_100%_at_top_right,white,transparent)]"></div>
 
     <div class="mx-auto max-w-7xl px-6 py-12 lg:px-8">
         <div class="text-center">
-            <img class="h-12 w-auto mx-auto mb-4" src="https://res.cloudinary.com/dtsuvx8dz/image/upload/v1706986565/hqatxpsjdg3zeql20jfe.png" alt="Logo">
-            <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Resume Parser Frontier</h1>
+            <img class="h-16 w-16 mx-auto mb-4 rounded-full" style="background: antiquewhite;" src="https://kabhishek18.com/media/profile_pics/DeveloperICon_resize.png" alt="Logo">
+            <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">KABHISHEK18</h1>
+            <h2 class="mt-4 text-3xl font-bold tracking-tight sm:text-3xl text-gray-300">Resume Parser Using Frontier Models</h2>
             <p class="mt-6 text-lg leading-8 text-gray-400">Instantly parse resumes with Gemini, OpenAI, or a local Ollama model.</p>
-        </div>
-
+        </div>    
         <div class="mt-16 mx-auto max-w-2xl bg-white/5 p-8 rounded-2xl ring-1 ring-white/10">
              {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
@@ -50,6 +65,13 @@
               {% endif %}
             {% endwith %}
 
+            {% if error %}
+            <div class="flash-message flash-error">
+                <p class="font-bold">An Error Occurred:</p>
+                <p>{{ error }}</p>
+            </div>
+            {% endif %}
+
             <form action="/process" method="post" enctype="multipart/form-data" id="resume-form">
                 <div class="space-y-6">
                     <div>
@@ -59,7 +81,7 @@
                     <div>
                          <label for="provider" class="block text-sm font-medium leading-6 text-white">Choose AI Provider</label>
                          <select id="provider" name="provider" class="mt-2 block w-full rounded-md border-0 bg-white/10 py-2.5 pl-3 pr-10 text-white ring-1 ring-inset ring-white/20 focus:ring-2 focus:ring-blue-500">
-                           <option value="gemini" {% if provider == 'gemini' %}selected{% endif %}>Google Gemini</option>
+                           <option value="gemini" {% if provider == 'gemini'  %}selected{% endif %}>Google Gemini</option>
                            <option value="openai" {% if provider == 'openai' %}selected{% endif %}>OpenAI GPT-3.5</option>
                            <option value="ollama" {% if provider == 'ollama' or not provider %}selected{% endif %}>Ollama (Local)</option>
                          </select>
@@ -76,10 +98,76 @@
 
         {% if data %}
         <div class="mt-16 mx-auto max-w-4xl">
-            <h2 class="text-2xl font-bold tracking-tight text-center">Parsed Resume Data (via {{ provider | capitalize }})</h2>
-            <div class="mt-6 bg-gray-800/50 p-6 rounded-2xl ring-1 ring-white/10">
-                <pre class="text-sm text-gray-200 whitespace-pre-wrap break-all"><code>{{ data | tojson(indent=4) }}</code></pre>
+            <h2 class="text-2xl font-bold tracking-tight text-center mb-4">Parsed Resume Data (via {{ provider | capitalize }})</h2>
+            
+            <div class="data-section">
+                <h3 class="data-heading">Candidate Details</h3>
+                <p><strong>Name:</strong> {{ data.full_name }}</p>
+                {% if data.contact_information %}
+                    <p><strong>Email:</strong> <a href="mailto:{{ data.contact_information.email }}" class="text-blue-400 hover:underline">{{ data.contact_information.email }}</a></p>
+                    <p><strong>Phone:</strong> {{ data.contact_information.phone }}</p>
+                {% endif %}
+                {% if data.professional_links %}
+                    <p><strong>LinkedIn:</strong> <a href="{{ data.professional_links.linkedin }}" target="_blank" class="text-blue-400 hover:underline">{{ data.professional_links.linkedin }}</a></p>
+                    <p><strong>GitHub:</strong> <a href="{{ data.professional_links.github }}" target="_blank" class="text-blue-400 hover:underline">{{ data.professional_links.github }}</a></p>
+                    <p><strong>Portfolio:</strong> <a href="{{ data.professional_links.portfolio }}" target="_blank" class="text-blue-400 hover:underline">{{ data.professional_links.portfolio }}</a></p>
+                {% endif %}
             </div>
+
+            {% if data.summary %}
+            <div class="data-section">
+                <h3 class="data-heading">Summary</h3>
+                <p class="text-gray-300">{{ data.summary }}</p>
+            </div>
+            {% endif %}
+
+            {% if data.experience %}
+            <div class="data-section">
+                <h3 class="data-heading">Work Experience</h3>
+                {% for job in data.experience %}
+                    <div class="mb-4">
+                        <p><strong>{{ job.position }}</strong> at <strong>{{ job.company }}</strong></p>
+                        <p class="text-sm text-gray-400">{{ job.duration }}</p>
+                        <ul class="list-disc list-inside mt-2 text-gray-300">
+                            {% for resp in job.responsibilities %}
+                                <li>{{ resp }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+             {% if data.education %}
+            <div class="data-section">
+                <h3 class="data-heading">Education</h3>
+                {% for edu in data.education %}
+                    <div class="mb-2">
+                        <p><strong>{{ edu.degree }}</strong> from <strong>{{ edu.institution }}</strong> ({{ edu.graduation_date }})</p>
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if data.skills %}
+            <div class="data-section">
+                <h3 class="data-heading">Skills</h3>
+                <p><strong>Technical:</strong> <span class="text-gray-300">{{ data.skills.technical | join(', ') }}</span></p>
+                <p><strong>Soft:</strong> <span class="text-gray-300">{{ data.skills.soft | join(', ') }}</span></p>
+            </div>
+            {% endif %}
+
+            {% if data.certifications %}
+            <div class="data-section">
+                <h3 class="data-heading">Certifications</h3>
+                <ul class="list-disc list-inside text-gray-300">
+                    {% for cert in data.certifications %}
+                        <li>{{ cert }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
         </div>
         {% endif %}
 
